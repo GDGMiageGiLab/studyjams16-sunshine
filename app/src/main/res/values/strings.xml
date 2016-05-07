@@ -5,4 +5,6 @@
     <string name="first_degree">21°</string>
     <string name="second_degree">8°</string>
     <string name="cloudy_text">Cloudy</string>
+
+    <string  name="api_key">67c2b6d72ed43d1fbaf58a6deb9d170c</string>
 </resources>

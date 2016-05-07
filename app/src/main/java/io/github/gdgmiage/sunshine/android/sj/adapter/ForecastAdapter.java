@@ -46,6 +46,11 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.ViewHo
         return 0;
     }
 
+    public void addItems(List<String> mItems){
+        this.mItems = mItems;
+        notifyDataSetChanged();
+    }
+
     static class ViewHolder extends RecyclerView.ViewHolder{
             TextView listItemForcastTextView;
 
