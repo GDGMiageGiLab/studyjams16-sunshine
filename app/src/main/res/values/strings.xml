@@ -7,4 +7,8 @@
     <string name="cloudy_text">Cloudy</string>
 
     <string  name="api_key">67c2b6d72ed43d1fbaf58a6deb9d170c</string>
+    <string name="default_location">Abidjan</string>
+    <string name="default_mode">json</string>
+    <string name="default_units">metric</string>
+    <string name="default_day_count">7</string>
 </resources>
