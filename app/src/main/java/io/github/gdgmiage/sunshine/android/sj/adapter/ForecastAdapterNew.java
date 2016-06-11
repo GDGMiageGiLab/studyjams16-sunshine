@@ -30,14 +30,12 @@ public class ForecastAdapterNew extends RecyclerView.Adapter<ForecastAdapterNew.
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.list_item_forecast,parent,false);
-        Log.e(TAG, "onCreateViewHolder");
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int position) {
         DayJson data = mItems.get(position);
-        Log.e(TAG, "onBindViewHolder");
         if (data !=null){
             final long date = data.date;
             final String weatherMain = data.weather.get(0).main;

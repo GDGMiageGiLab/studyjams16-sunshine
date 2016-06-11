@@ -1,11 +1,15 @@
 package io.github.gdgmiage.sunshine.android.sj;
 
 import android.app.ProgressDialog;
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -35,9 +39,23 @@ import java.util.List;
 
 import io.github.gdgmiage.sunshine.android.sj.adapter.ForecastAdapter;
 import io.github.gdgmiage.sunshine.android.sj.adapter.ForecastAdapterNew;
+import io.github.gdgmiage.sunshine.android.sj.database.ForecastDbHelper;
+import io.github.gdgmiage.sunshine.android.sj.database.async.ForecastSaveDbTask;
 import io.github.gdgmiage.sunshine.android.sj.pojo.DayJson;
 import io.github.gdgmiage.sunshine.android.sj.pojo.ForecastJson;
+import io.github.gdgmiage.sunshine.android.sj.rest.OpenWeatherMapRest;
+import io.github.gdgmiage.sunshine.android.sj.rest.OpenWeatherMapService;
 import io.github.gdgmiage.sunshine.android.sj.util.Developer;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+
+import static io.github.gdgmiage.sunshine.android.sj.database.ForecastContract.ForecastEntry.COLUMN_NAME_DATE_TIME;
+import static io.github.gdgmiage.sunshine.android.sj.database.ForecastContract.ForecastEntry.COLUMN_NAME_TEMP_MAX;
+import static io.github.gdgmiage.sunshine.android.sj.database.ForecastContract.ForecastEntry.COLUMN_NAME_TEMP_MIN;
+import static io.github.gdgmiage.sunshine.android.sj.database.ForecastContract.ForecastEntry.COLUMN_NAME_WEATHER_ID;
+import static io.github.gdgmiage.sunshine.android.sj.database.ForecastContract.ForecastEntry.COLUMN_NAME_WEATHER_MAIN;
+import static io.github.gdgmiage.sunshine.android.sj.database.ForecastContract.ForecastEntry.TABLE_NAME;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -45,17 +63,18 @@ import io.github.gdgmiage.sunshine.android.sj.util.Developer;
 public class MainActivityFragment extends Fragment  {
 
     private static final String TAG = MainActivityFragment.class.getSimpleName();
-    private static final String PARAM_QUERY = "q";
-    private static final String PARAM_MODE = "mode";
-    private static final String PARAM_UNITS = "units";
-    private static final String PARAM_CNT = "cnt";
-    private static final String PARAM_APP_ID = "APPID";
+    public static final String PARAM_QUERY = "q";
+    public static final String PARAM_MODE = "mode";
+    public static final String PARAM_UNITS = "units";
+    public static final String PARAM_CNT = "cnt";
+    public static final String PARAM_APP_ID = "APPID";
     //private ListView mListView;
     private RecyclerView mRecyclerView;
     //private List<String> weekForecast;
     private List<DayJson> weekForecast;
     //private ForecastAdapter forecastAdapter = null;
     private ForecastAdapterNew forecastAdapter = null;
+
 
     public MainActivityFragment() {
     }
@@ -89,11 +108,104 @@ public class MainActivityFragment extends Fragment  {
         mRecyclerView.setAdapter(forecastAdapter);
 
         // Create an forecast task
-        ForecastTask forecastTask = new ForecastTask(getActivity());
+        //ForecastTask forecastTask = new ForecastTask(getActivity());
         // run our task
-        forecastTask.execute();
+        //forecastTask.execute();
+         final Call<ForecastJson> forecastJsonCall = OpenWeatherMapRest.getWeekForecast(getString(R.string.default_location));
+        forecastJsonCall.enqueue(new
+                                         Callback<ForecastJson>() {
+                                             @Override
+                                             public void onResponse(Call<ForecastJson> call, Response<ForecastJson> response) {
+                                                 Log.d(TAG, "Cool les gars ça passe");
+                                                 if (response !=null && response.isSuccessful()){
+                                                     weekForecast = response.body().list;
+                                                     forecastAdapter.addItems(weekForecast);
+                                                     new ForecastSaveDbTask(getActivity()).execute(weekForecast);
+                                                 }
+                                             }
+
+                                             @Override
+                                             public void onFailure(final Call<ForecastJson> call, Throwable t) {
+                                                 Log.e(TAG, "Désolé c'est du spagetthi",t);
+                                                 if (t instanceof java.net.SocketTimeoutException || t instanceof java.net.ConnectException){
+                                                     new AlertDialog.Builder(getActivity())
+                                                             .setMessage("Pétit Vérifie ta connexion internet ")
+                                                             .setPositiveButton("Reply", new DialogInterface.OnClickListener() {
+                                                                 @Override
+                                                                 public void onClick(DialogInterface dialog, int which) {
+                                                                     OpenWeatherMapRest.getWeekForecast(getString(R.string.default_location)).enqueue(new Callback<ForecastJson>() {
+                                                                         @Override
+                                                                         public void onResponse(Call<ForecastJson> call, Response<ForecastJson> response) {
+                                                                             Log.d(TAG, "Cool les gars ça passe");
+
+                                                                             if (response !=null && response.isSuccessful()){
+                                                                                 weekForecast = response.body().list;
+                                                                                 forecastAdapter.addItems(weekForecast);
+
+                                                                             }
+                                                                         }
+
+                                                                         @Override
+                                                                         public void onFailure(Call<ForecastJson> call, Throwable t) {
+
+                                                                         }
+                                                                     });
+                                                                 }
+                                                             })
+                                                             .setNegativeButton("Ok", new DialogInterface.OnClickListener() {
+                                                                 @Override
+                                                                 public void onClick(DialogInterface dialog, int which) {
+
+                                                                 }
+                                                             })
+                                                             .show();
+
+                                                 }
+
+                                             }
+                                         });
+
+
+
 
         return v;
+    }
+
+    public void saveAll(List<DayJson> dayJsons){
+        ForecastDbHelper mDbHelper = new ForecastDbHelper(getContext());
+        SQLiteDatabase db =  mDbHelper.getWritableDatabase();
+        DayJson dayJson = null;
+        ContentValues values = null;
+
+        Log.w(TAG, "DAYS "+dayJsons);
+
+        if(dayJsons != null && dayJsons.size()>0){
+            for(int i=0; i<dayJsons.size(); i++){
+                dayJson = dayJsons.get(i);
+                values = new ContentValues();
+                if(dayJson !=null){
+                    if(dayJson.temp !=null){
+                        values.put(COLUMN_NAME_TEMP_MAX, dayJson.temp.max);
+                        values.put(COLUMN_NAME_TEMP_MIN, dayJson.temp.min);
+                    }
+
+                    values.put(COLUMN_NAME_DATE_TIME, dayJson.date);
+                    if (dayJson.weather !=null && dayJson.weather.size()>0){
+                        if(dayJson.weather.get(0) !=null){
+                            values.put(COLUMN_NAME_WEATHER_ID, dayJson.weather.get(0).id);
+                            values.put(COLUMN_NAME_WEATHER_MAIN, dayJson.weather.get(0).main);
+                        }
+
+                    }
+
+                }
+
+                final long forecastId = db.insert(TABLE_NAME, null, values);
+                Log.d(TAG, "Forecast Id"+forecastId);
+
+            }
+        }
+
     }
 
     public String loadForecastData(){
@@ -115,7 +227,7 @@ public class MainActivityFragment extends Fragment  {
         BufferedReader bufferedReader = null;
 
         try {
-            URL url = new URL(urlString);
+            final URL url = new URL(urlString);
             HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
             urlConnection.setRequestMethod("GET");
             urlConnection.connect();
@@ -179,7 +291,7 @@ public class MainActivityFragment extends Fragment  {
         @Override
         protected ForecastJson doInBackground(Void... params) {
             Log.d(TAG, "doInBackground ==> In ForecastTask ");
-            String jsonResponse = loadForecastData();
+            final String jsonResponse = loadForecastData();
             final Gson gson = new Gson();
             return gson.fromJson(jsonResponse,ForecastJson.class);
         }

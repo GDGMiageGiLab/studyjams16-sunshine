@@ -26,14 +26,14 @@ public class ForecastAdapter extends RecyclerView.Adapter<ForecastAdapter.ViewHo
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.list_item_forecast,parent,false);
-        Log.e(TAG, "onCreateViewHolder");
+
         return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int position) {
         String data = mItems.get(position);
-        Log.e(TAG, "onBindViewHolder");
+
         holder.listItemForcastTextView.setText(data);
 
     }
